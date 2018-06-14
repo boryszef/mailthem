@@ -2,6 +2,8 @@ We are pleased to inform you that the eighth edition of the international
 conference Modeling and Design of Molecular Materials (MDMM 2018) will be
 held in Polanica-Zdrój (Poland) from June 24-th till June 28-th, 2018.
 
+[MDMM2018 logo:logo.jpg]
+
 MDMM is a biannual conference devoted to presenting contemporary
 computational methods along with their applications in molecular modeling
 and molecular material design and related fields. Participation of

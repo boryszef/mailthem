@@ -1,29 +1,28 @@
 """Send bulk email to mail addresses listed in a file"""
 
 # Setup
-emailFrom    = "MDMM2018 <mdmm@mdmm.pl>"
-emailSubject = "MDMM2018 - conference announcement"
+emailFrom    = "John Doe <doe@example.com>"
+emailSubject = "[MDMM2018] Announcement"
+fileEmails   = "emails.txt"
 filePlain    = "plain.txt"
 fileRich     = "rich.html"
-fileEmails   = "emails.txt"
-attachments  = []
-mailServer   = "ssmtp.example.com"
-mailUser     = "mdmm"
+attachments  = ['logo.jpg']
+mailServer   = "smtp.example.com"
+mailUser     = "robot"
 dryRun       = False
 # End of setup
 
 import smtplib
 import getpass
 import mimetypes
+import re
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 from email.utils import COMMASPACE
+from collections import namedtuple
 
-userList = open(fileEmails).readlines()
-
-text = open(filePlain).read()
-html = open(fileRich).read()
-
+MType = namedtuple('MType', ['type', 'encoding', 'maintype', 'subtype'])
 
 class Message(MIMEMultipart):
 
@@ -44,20 +43,24 @@ class Message(MIMEMultipart):
             if ctype is None:
                 raise RuntimeError("Could not guess the MIME type")
             maintype, subtype = ctype.split('/', 1)
-            attachment_types[att] = (ctype, encoding, maintype, subtype)
+            attachment_types[att] = MType(ctype, encoding, maintype, subtype)
 
         if bodyplain:
-            text = MIMEText(bodyplain, 'plain')
+            text = MIMEText(bodyplain, _subtype='plain', _charset='UTF-8')
 
         if bodyhtml:
             image_cid = {}
-            for att in attachment_types:
-                if att[2] != 'image': continue
-                reference = re.search("src=\"({})\"".format(att), bodyhtml,
-                                       re.I|re.M)
-                if reference:
-                    print(reference)
-            html = MIMEText(bodyhtml, 'html')
+            idx = 0
+            for aname, atypes in attachment_types.items():
+                if atypes.maintype != 'image': continue
+                cid = "image{}".format(idx)
+                idx += 1
+                pattern = 'src\s*=\s*"{}"'.format(aname)
+                substitute = 'src="cid:{}"'.format(cid)
+                bodyhtml = re.sub(pattern, substitute, bodyhtml,
+                                  re.IGNORECASE|re.MULTILINE)
+                image_cid[aname] = cid
+            html = MIMEText(bodyhtml, _subtype='html', _charset='UTF-8')
 
         if bodyplain and bodyhtml:
             alternative = MIMEMultipart('alternative')
@@ -71,13 +74,22 @@ class Message(MIMEMultipart):
         else:
             raise RuntimeError("plain text or html message must be present")
 
-        for attname,atttype in attachment_types.items():
-            break
-            with open(att) as atm_file:
-                atm = MIMEText(atm_file.read(), _subtype=subtype)
-                atm.add_header('Content-Disposition', 'attachment',
-                               filename=att)
-                self.attach(atm)
+        for atname,attype in attachment_types.items():
+            if attype.maintype == 'image':
+                with open(atname, 'rb') as atfile:
+                    atm = MIMEImage(atfile.read(), _subtype=attype.subtype)
+                    if atname in image_cid:
+                        cid = image_cid[atname]
+                        atm.add_header('Content-ID', '<{}>'.format(cid))
+            elif attype.maintype == 'text':
+                with open(att) as atfile:
+                    atm = MIMEText(atfile.read(), _subtype=attype.subtype)
+            else:
+                raise NotImplementedError(
+                    "{} attachments are not implemented".format(attype.ctype))
+            atm.add_header('Content-Disposition', 'attachment',
+                           filename=atname)
+            self.attach(atm)
 
 
 class Sender(object):
@@ -95,8 +107,9 @@ class Sender(object):
             self.smtp.ehlo()
             self.smtp.starttls()
             self.smtp.login(self.user, self.password)
+        return self
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         if not self.dry_run:
             self.smtp.quit()
 
@@ -110,12 +123,21 @@ class Sender(object):
 
 if __name__ == '__main__':
 
-    mailPassword = getpass.getpass("Enter mailbox password:")
+    mailPassword = getpass.getpass("Enter mailbox password: ")
+
+    with open(fileEmails) as fp:
+        recp_list = [ x.strip() for x in fp.readlines() ]
+
+    with open(filePlain) as fp:
+        bodyplain = fp.read()
+
+    with open(fileRich) as fp:
+        bodyhtml = fp.read()
 
     with Sender(mailServer, mailUser, mailPassword, dryRun) as snd:
-        for u in userList:
-            user = u.strip()
-            print("Sending to", user, "...")
-            msg = Message(emailFrom, u, emailSubject, bodyplain)
+        msg = Message(emailFrom, '', emailSubject, bodyplain, bodyhtml,
+                      attachments)
+        for recp in recp_list:
+            print("Sending to", recp, "...")
+            msg.replace_header('To', recp)
             out = snd.send(msg)
-            if out: print(out)

@@ -75,7 +75,10 @@ class TestMessage(unittest.TestCase):
         msg = Message(self.fromaddr, self.toaddr, self.subject,
                       self.bodyplain, self.bodyhtml, ['logo.jpg'])
         txt = msg.as_string()
-        print(txt)
+        result = re.search("^Content-Type: image/jpeg", txt, re.M)
+        self.assertTrue(result)
+        result = re.search("^Content-ID: <image\d+>", txt, re.M)
+        self.assertTrue(result)
 
 if __name__ == '__main__':
     unittest.main()
