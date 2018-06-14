@@ -36,6 +36,7 @@ class Message(MIMEMultipart):
         if isinstance(toaddr, str):
             toaddr = [toaddr]
         self['To'] = COMMASPACE.join(toaddr)
+        self.preamble = 'This is a multi-part message in MIME format.'
 
         if bodyplain:
             text = MIMEText(bodyplain, 'plain')
