@@ -10,7 +10,12 @@ class TestMessage(unittest.TestCase):
         self.toaddr = "you@example.net"
         self.subject = "Blah blah"
         self.bodyplain = "Hello,\nBye"
-        self.bodyhtml = "<html><body><p>Hello,</p><p>Bye</p></body></html>"
+        self.bodyhtml = """<html>
+        <body>
+        <p>Hello,</p>
+        <p>Bye <img src="logo.jpg" /></p>
+        </body>
+        </html>"""
 
     def test_from(self):
         msg = Message(self.fromaddr, self.toaddr, self.subject,
@@ -59,12 +64,17 @@ class TestMessage(unittest.TestCase):
         result = re.search("^Content-Type: text/html;", txt, re.M)
         self.assertTrue(result)
 
-    def test_html(self):
+    def test_plain_and_html(self):
         msg = Message(self.fromaddr, self.toaddr, self.subject,
                       self.bodyplain, self.bodyhtml)
         txt = msg.as_string()
         result = re.search("^Content-Type: multipart/alternative;", txt, re.M)
         self.assertTrue(result)
+
+    def test_attachment(self):
+        msg = Message(self.fromaddr, self.toaddr, self.subject,
+                      self.bodyplain, self.bodyhtml, ['logo.jpg'])
+        txt = msg.as_string()
         print(txt)
 
 if __name__ == '__main__':

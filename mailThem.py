@@ -38,10 +38,25 @@ class Message(MIMEMultipart):
         self['To'] = COMMASPACE.join(toaddr)
         self.preamble = 'This is a multi-part message in MIME format.'
 
+        attachment_types = {}
+        for att in attachments:
+            ctype, encoding = mimetypes.guess_type(att)
+            if ctype is None:
+                raise RuntimeError("Could not guess the MIME type")
+            maintype, subtype = ctype.split('/', 1)
+            attachment_types[att] = (ctype, encoding, maintype, subtype)
+
         if bodyplain:
             text = MIMEText(bodyplain, 'plain')
 
         if bodyhtml:
+            image_cid = {}
+            for att in attachment_types:
+                if att[2] != 'image': continue
+                reference = re.search("src=\"({})\"".format(att), bodyhtml,
+                                       re.I|re.M)
+                if reference:
+                    print(reference)
             html = MIMEText(bodyhtml, 'html')
 
         if bodyplain and bodyhtml:
@@ -56,11 +71,8 @@ class Message(MIMEMultipart):
         else:
             raise RuntimeError("plain text or html message must be present")
 
-        for att in attachments:
-            ctype, encoding = mimetypes.guess_type(att)
-            if ctype is None:
-                raise RuntimeError("Could not guess the MIME type")
-            maintype, subtype = ctype.split('/', 1)
+        for attname,atttype in attachment_types.items():
+            break
             with open(att) as atm_file:
                 atm = MIMEText(atm_file.read(), _subtype=subtype)
                 atm.add_header('Content-Disposition', 'attachment',
