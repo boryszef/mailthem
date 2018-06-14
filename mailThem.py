@@ -33,6 +33,8 @@ class Message(MIMEMultipart):
         super(Message, self).__init__()
         self['Subject'] = subject
         self['From'] = fromaddr
+        if isinstance(toaddr, str):
+            toaddr = [toaddr]
         self['To'] = COMMASPACE.join(toaddr)
 
         if bodyplain:
@@ -54,14 +56,14 @@ class Message(MIMEMultipart):
             raise RuntimeError("plain text or html message must be present")
 
         for att in attachments:
-            ctype, encoding = mimetypes.guess_type(attachment)
+            ctype, encoding = mimetypes.guess_type(att)
             if ctype is None:
                 raise RuntimeError("Could not guess the MIME type")
             maintype, subtype = ctype.split('/', 1)
-            with open(attachment) as atm_file:
+            with open(att) as atm_file:
                 atm = MIMEText(atm_file.read(), _subtype=subtype)
                 atm.add_header('Content-Disposition', 'attachment',
-                               filename=attachment)
+                               filename=att)
                 self.attach(atm)
 
 
