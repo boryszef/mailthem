@@ -1,6 +1,7 @@
 from mailThem import Message
 import unittest
 import re
+from sys import argv
 
 
 class TestMessage(unittest.TestCase):
@@ -21,30 +22,34 @@ class TestMessage(unittest.TestCase):
         msg = Message(self.fromaddr, self.toaddr, self.subject,
                       self.bodyplain)
         txt = msg.as_string()
-        result = re.search("^From: {}".format(self.fromaddr), txt, re.M)
+        result = re.search("^From: (.*)$", txt, re.M)
         self.assertTrue(result)
+        self.assertEqual(result.group(1), self.fromaddr)
 
     def test_single_to(self):
         msg = Message(self.fromaddr, self.toaddr, self.subject,
                       self.bodyplain)
         txt = msg.as_string()
-        result = re.search("^To: {}".format(self.toaddr), txt, re.M)
+        result = re.search("^To: (.*)$", txt, re.M)
         self.assertTrue(result)
+        self.assertEqual(result.group(1), self.toaddr)
 
     def test_multiple_to(self):
         to = ['a@b.com', 'b@c.com', 'd@e.com']
         msg = Message(self.fromaddr, to, self.subject,
                       self.bodyplain)
         txt = msg.as_string()
-        result = re.search("^To: {}".format(", ".join(to)), txt, re.M)
+        result = re.search("^To: (.*)$", txt, re.M)
         self.assertTrue(result)
+        self.assertEqual(result.group(1), ", ".join(to))
 
     def test_subject(self):
         msg = Message(self.fromaddr, self.toaddr, self.subject,
                       self.bodyplain)
         txt = msg.as_string()
-        result = re.search("^Subject: {}".format(self.subject), txt, re.M)
+        result = re.search("^Subject: (.*)$".format(self.subject), txt, re.M)
         self.assertTrue(result)
+        self.assertEqual(result.group(1), self.subject)
 
     def test_no_body(self):
         with self.assertRaises(RuntimeError):
@@ -71,7 +76,7 @@ class TestMessage(unittest.TestCase):
         result = re.search("^Content-Type: multipart/alternative;", txt, re.M)
         self.assertTrue(result)
 
-    def test_attachment(self):
+    def test_attach_image(self):
         msg = Message(self.fromaddr, self.toaddr, self.subject,
                       self.bodyplain, self.bodyhtml, ['logo.jpg'])
         txt = msg.as_string()
@@ -79,6 +84,25 @@ class TestMessage(unittest.TestCase):
         self.assertTrue(result)
         result = re.search("^Content-ID: <image\d+>", txt, re.M)
         self.assertTrue(result)
+
+    def test_attach_script(self):
+        msg = Message(self.fromaddr, self.toaddr, self.subject,
+                      self.bodyplain, self.bodyhtml, [argv[0]])
+        txt = msg.as_string()
+        result = re.search("^Content-Type: text/x-python", txt, re.M)
+        self.assertTrue(result)
+
+    def test_two_attachments(self):
+        msg = Message(self.fromaddr, self.toaddr, self.subject,
+                      self.bodyplain, self.bodyhtml, ['logo.jpg', argv[0]])
+        txt = msg.as_string()
+        print(txt)
+        pattern = re.compile("^Content-Disposition: attachment;")
+        count = 0
+        for match in pattern.finditer(txt, re.M):
+            count += 1
+        self.assertEqual(count, 2)
+
 
 if __name__ == '__main__':
     unittest.main()
