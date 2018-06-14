@@ -6,6 +6,7 @@ emailSubject = "MDMM2018 - conference announcement"
 filePlain    = "plain.txt"
 fileRich     = "rich.html"
 fileEmails   = "emails.txt"
+attachments  = []
 mailServer   = "ssmtp.example.com"
 mailUser     = "mdmm"
 dryRun       = False
@@ -13,23 +14,56 @@ dryRun       = False
 
 import smtplib
 import getpass
+import mimetypes
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import COMMASPACE
 
 userList = open(fileEmails).readlines()
-
-msg = MIMEMultipart('alternative')
-msg['Subject'] = emailSubject
-msg['From'] = emailFrom
-msg['To'] = ""
 
 text = open(filePlain).read()
 html = open(fileRich).read()
 
-part1 = MIMEText(text, 'plain')
-part2 = MIMEText(html, 'html')
-msg.attach(part1)
-msg.attach(part2)
+
+class Message(MIMEMultipart):
+
+    def __init__(self, fromaddr, toaddr, subject, bodyplain=None,
+                 bodyhtml=None, attachments=[]):
+
+        super(Message, self).__init__()
+        self['Subject'] = subject
+        self['From'] = fromaddr
+        self['To'] = COMMASPACE.join(toaddr)
+
+        if bodyplain:
+            text = MIMEText(bodyplain, 'plain')
+
+        if bodyhtml:
+            html = MIMEText(bodyhtml, 'html')
+
+        if bodyplain and bodyhtml:
+            alternative = MIMEMultipart('alternative')
+            alternative.attach(text)
+            alternative.attach(html)
+            self.attach(alternative)
+        elif bodyplain:
+            self.attach(text)
+        elif bodyhtml:
+            self.attach(html)
+        else:
+            raise RuntimeError("plain text or html message must be present")
+
+        for att in attachments:
+            ctype, encoding = mimetypes.guess_type(attachment)
+            if ctype is None:
+                raise RuntimeError("Could not guess the MIME type")
+            maintype, subtype = ctype.split('/', 1)
+            with open(attachment) as atm_file:
+                atm = MIMEText(atm_file.read(), _subtype=subtype)
+                atm.add_header('Content-Disposition', 'attachment',
+                               filename=attachment)
+                self.attach(atm)
+
 
 class Sender(object):
 
@@ -67,6 +101,6 @@ if __name__ == '__main__':
         for u in userList:
             user = u.strip()
             print("Sending to", user, "...")
-            msg.replace_header('To', u)
+            msg = Message(emailFrom, u, emailSubject, bodyplain)
             out = snd.send(msg)
             if out: print(out)
